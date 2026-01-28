@@ -160,4 +160,4 @@ Resources:
 Outputs:
   WebServerPublicURL:
     Description: URL of the EC2-hosted site
-    Value: !Sub "http://${WebServer.PublicDnsName}"
+    Value: "http://${WebServer.PublicDnsName}"
