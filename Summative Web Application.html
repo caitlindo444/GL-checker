@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>General Ledger Checker</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 40px;
+        background: #f7f7f7;
+    }
+    h1 {
+        text-align: center;
+    }
+    #container {
+        max-width: 800px;
+        margin: auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+    th, td {
+        border: 1px solid #ccc;
+        padding: 8px;
+        text-align: left;
+    }
+    th {
+        background: #eee;
+    }
+    #issues {
+        margin-top: 20px;
+        padding: 15px;
+        background: #f1f1f1;
+        border-radius: 6px;
+    }
+</style>
+</head>
+<body>
+
+<div id="container">
+    <h1>General Ledger Checker</h1>
+    <p>Upload a CSV file containing columns such as Date, Cost Centre, Description, Debit, and Credit.</p>
+
+    <input type="file" id="fileInput" accept=".csv">
+    <div id="output"></div>
+    <div id="issues"><strong>Issues will appear here.</strong></div> </div>
+
+<script>
+document.getElementById("fileInput").addEventListener("change", function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = function(event) {
+        const text = event.target.result;
+
+        // Split rows and trim whitespace
+        let rawRows = text.split(/\r?\n/);
+
+        // Convert CSV rows to columns & remove BOM + trim
+        let rows = rawRows
+            .map(r => r.split(",").map(c => c.trim().replace(/^\uFEFF/, "")))
+            // IGNORE completely empty rows (FIX FOR YOUR BUG)
+            .filter(r => !(r.length === 1 && r[0] === "") && r.some(cell => cell !== ""));
+
+        displayTable(rows);
+        validateLedger(rows);
+    };
+
+    reader.readAsText(file);
+});
+
+function displayTable(rows) {
+    let html = "<table>";
+    rows.forEach((row, index) => {
+        html += "<tr>";
+        row.forEach(cell => {
+            html += index === 0 ? `<th>${cell}</th>` : `<td>${cell}</td>`;
+        });
+        html += "</tr>";
+    });
+    html += "</table>";
+
+    document.getElementById("output").innerHTML = html; }
+
+function validateLedger(rows) {
+    const issues = [];
+
+    // Header cleanup
+    const header = rows[0].map(h => h.trim().replace(/^\uFEFF/, ""));
+
+    const debitIndex = header.indexOf("Debit");
+    const creditIndex = header.indexOf("Credit");
+
+    if (debitIndex === -1 || creditIndex === -1) {
+        document.getElementById("issues").innerHTML =
+            "<p>Error: CSV file does not contain required 'Debit' and 'Credit' columns.</p>";
+        return;
+    }
+
+    rows.slice(1).forEach((row, i) => {
+        const rowNum = i + 2;
+
+        const cleanRow = row.map(c => c.trim());
+
+        const debit = parseFloat(cleanRow[debitIndex]) || 0;
+        const credit = parseFloat(cleanRow[creditIndex]) || 0;
+
+        // Missing values (only flag if it's not a blank row)
+        if (cleanRow.some(cell => cell === "")) {
+            issues.push(`Row ${rowNum}: Missing value(s).`);
+        }
+
+        // Debit must equal Credit
+        if (debit !== credit) {
+            issues.push(`Row ${rowNum}: Debit (£${debit}) does not match Credit (£${credit}).`);
+        }
+
+        // Large values
+        if (Math.abs(debit) > 10000 || Math.abs(credit) > 10000) {
+            issues.push(`Row ${rowNum}: Contains unusually large values.`);
+        }
+    });
+
+    document.getElementById("issues").innerHTML =
+        issues.length ? issues.map(i => `<p>• ${i}</p>`).join("") : "<p>No issues found.</p>"; } </script>
+
+</body>
+</html>
+
